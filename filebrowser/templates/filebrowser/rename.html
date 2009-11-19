@@ -3,16 +3,29 @@
 <!-- LOADING -->
 {% load i18n adminmedia fb_tags %}
 
-<!-- STYLESHEETS -->
-{% block stylesheets %}
+<!-- EXTRAHEAD -->
+{% block extrahead %}
     {{ block.super }}
-    <link rel="stylesheet" type="text/css" href="{% admin_media_prefix %}css/forms.css" />
-    <link rel="stylesheet" type="text/css" href="{{ settings_var.URL_FILEBROWSER_MEDIA }}css/filebrowser.css" />
+    <script type="text/javascript" src="../../jsi18n/"></script>
+    <script type="text/javascript" src="{% admin_media_prefix %}js/core.js"></script>
+    <script type="text/javascript" src="{% admin_media_prefix %}js/admin/CollapsedFieldsets.js"></script>
 {% endblock %}
 
 <!-- COLTYPE/BODYCLASS -->
 {% block coltype %}colM{% endblock %}
-{% block bodyclass %}change-form filebrowser{% if query.pop %} popup{% endif %}{% endblock %}
+{% block bodyclass %}change-form{% endblock %}
+
+<!-- EXTRASTYLE -->
+{% block extrastyle %}
+    {{ block.super }}
+    <link rel="stylesheet" type="text/css" href="{% admin_media_prefix %}css/forms.css" />
+    <link rel="stylesheet" type="text/css" href="{{ settings_var.URL_FILEBROWSER_MEDIA }}css/filebrowser.css" />
+    {% if query.pop %}
+    <style type="text/css">
+    #header { display: none; }
+    </style>
+{% endif %}
+{% endblock %}
 
 <!-- BREADCRUMBS -->
 {% block breadcrumbs %}{% include "filebrowser/include/breadcrumbs.html" %}{% endblock %}
@@ -29,7 +42,16 @@
             <label class="required" for="id_dir_name">{{ form.name.label }}</label>
             {{ form.name }}
             {% if file_extension %}<b>{{ file_extension }}</b>{% endif %}
-            {% if form.name.help_text %}<p class="help">{{ form.name.help_text|safe }}</p>{% endif %}
+        </div>
+        </fieldset>
+        <fieldset class="module aligned collapse">
+        <h2>{% trans "Help" %}</h2>
+        <div class="form-row" >
+            <label class="required">&nbsp;</label> 
+            <p>
+                {{ form.name.help_text|safe }}
+                {% if settings_var.CONVERT_FILENAME %}<br />{% trans "The Name will be converted to lowercase. Spaces will be replaced with underscores." %}{% endif %}
+            </p>
         </div>
         </fieldset>
         <div class="submit-row">
