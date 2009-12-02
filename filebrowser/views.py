@@ -8,8 +8,6 @@ from time import gmtime, strftime
 from django.shortcuts import render_to_response, HttpResponse
 from django.template import RequestContext as Context
 from django.http import HttpResponseRedirect
-from django.contrib.admin.views.decorators import staff_member_required
-from django.views.decorators.cache import never_cache
 from django.utils.translation import ugettext as _
 from django.conf import settings
 from django import forms
@@ -37,12 +35,12 @@ def browse(request):
     """
     Browse Files/Directories.
     """
-    
+
     # QUERY / PATH CHECK
     query = request.GET
     path = get_path(query.get('dir', ''))
     directory = get_path('')
-    
+
     if path is None:
         msg = _('The requested Folder does not exist.')
         request.user.message_set.create(message=msg)
@@ -52,17 +50,17 @@ def browse(request):
         redirect_url = reverse("fb_browse") + query_helper(query, "", "dir")
         return HttpResponseRedirect(redirect_url)
     abs_path = os.path.join(MEDIA_ROOT, DIRECTORY, path)
-    
+
     # INITIAL VARIABLES
     results_var = {'results_total': 0, 'results_current': 0, 'delete_total': 0, 'images_total': 0, 'select_total': 0 }
     counter = {}
     for k,v in EXTENSIONS.iteritems():
         counter[k] = 0
-    
+
     dir_list = os.listdir(abs_path)
     files = []
     for file in dir_list:
-        
+
         # EXCLUDE FILES MATCHING VERSIONS_PREFIX OR ANY OF THE EXCLUDE PATTERNS
         filtered = file.startswith('.')
         for re_prefix in filter_re:
@@ -71,17 +69,17 @@ def browse(request):
         if filtered:
             continue
         results_var['results_total'] += 1
-        
+
         # CREATE FILEOBJECT
         fileobject = FileObject(os.path.join(DIRECTORY, path, file))
-        
+
         # FILTER / SEARCH
         append = False
         if fileobject.filetype == request.GET.get('filter_type', fileobject.filetype) and get_filterdate(request.GET.get('filter_date', ''), fileobject.date):
             append = True
         if request.GET.get('q') and not re.compile(request.GET.get('q').lower(), re.M).search(file.lower()):
             append = False
-        
+
         # APPEND FILE_LIST
         if append:
             try:
@@ -102,16 +100,16 @@ def browse(request):
             else:
                 files.append(fileobject)
                 results_var['results_current'] += 1
-        
+
         # COUNTER/RESULTS
         if fileobject.filetype:
             counter[fileobject.filetype] += 1
-    
+
     # SORTING
     files = sort_by_attr(files, request.GET.get('o', 'filename_lower'))
     if request.GET.get('ot') == "desc":
         files.reverse()
-    
+
     return render_to_response('filebrowser/index.html', {
         'dir': path,
         'files': files,
@@ -122,7 +120,6 @@ def browse(request):
         'settings_var': get_settings_var(),
         'breadcrumbs': get_breadcrumbs(query, path, ''),
     }, context_instance=Context(request))
-browse = staff_member_required(never_cache(browse))
 
 
 # mkdir signals
@@ -133,9 +130,9 @@ def mkdir(request):
     """
     Make Directory.
     """
-    
+
     from filebrowser.forms import MakeDirForm
-    
+
     # QUERY / PATH CHECK
     query = request.GET
     path = get_path(query.get('dir', ''))
@@ -144,7 +141,7 @@ def mkdir(request):
         request.user.message_set.create(message=msg)
         return HttpResponseRedirect(reverse("fb_browse"))
     abs_path = os.path.join(MEDIA_ROOT, DIRECTORY, path)
-    
+
     if request.method == 'POST':
         form = MakeDirForm(abs_path, request.POST)
         if form.is_valid():
@@ -171,7 +168,7 @@ def mkdir(request):
                     form.errors['dir_name'] = forms.util.ErrorList([_('Error creating folder.')])
     else:
         form = MakeDirForm(abs_path)
-    
+
     return render_to_response('filebrowser/makedir.html', {
         'form': form,
         'query': query,
@@ -179,16 +176,15 @@ def mkdir(request):
         'settings_var': get_settings_var(),
         'breadcrumbs': get_breadcrumbs(query, path, _(u'New Folder')),
     }, context_instance=Context(request))
-mkdir = staff_member_required(never_cache(mkdir))
 
 
 def upload(request):
     """
     Multipe File Upload.
     """
-    
+
     from django.http import parse_cookie
-    
+
     # QUERY / PATH CHECK
     query = request.GET
     path = get_path(query.get('dir', ''))
@@ -197,12 +193,12 @@ def upload(request):
         request.user.message_set.create(message=msg)
         return HttpResponseRedirect(reverse("fb_browse"))
     abs_path = os.path.join(MEDIA_ROOT, DIRECTORY, path)
-    
+
     # SESSION (used for flash-uploading)
     cookie_dict = parse_cookie(request.META.get('HTTP_COOKIE', ''))
     engine = __import__(settings.SESSION_ENGINE, {}, {}, [''])
     session_key = cookie_dict.get(settings.SESSION_COOKIE_NAME, None)
-    
+
     return render_to_response('filebrowser/upload.html', {
         'query': query,
         'title': _(u'Select files to upload'),
@@ -210,20 +206,19 @@ def upload(request):
         'breadcrumbs': get_breadcrumbs(query, path, _(u'Upload')),
         'session_key': session_key,
     }, context_instance=Context(request))
-upload = staff_member_required(never_cache(upload))
 
 
 def _check_file(request):
     """
     Check if file already exists on the server.
     """
-    
+
     from django.utils import simplejson
-    
+
     folder = request.POST.get('folder')
     fb_uploadurl_re = re.compile(r'^(%s)' % reverse("fb_upload"))
     folder = fb_uploadurl_re.sub('', folder)
-    
+
     fileArray = {}
     if request.method == 'POST':
         for k,v in request.POST.items():
@@ -231,7 +226,7 @@ def _check_file(request):
                 v = convert_filename(v)
                 if os.path.isfile(os.path.join(MEDIA_ROOT, DIRECTORY, folder, v)):
                     fileArray[k] = v
-    
+
     return HttpResponse(simplejson.dumps(fileArray))
 
 
@@ -243,9 +238,9 @@ def _upload_file(request):
     """
     Upload file to the server.
     """
-    
+
     from django.core.files.move import file_move_safe
-    
+
     if request.method == 'POST':
         folder = request.POST.get('folder')
         fb_uploadurl_re = re.compile(r'^(%s)' % reverse("fb_upload"))
@@ -277,10 +272,10 @@ filebrowser_post_delete = Signal(providing_args=["path", "filename"])
 def delete(request):
     """
     Delete existing File/Directory.
-    
+
     When trying to delete a Directory, the Directory has to be empty.
     """
-    
+
     # QUERY / PATH CHECK
     query = request.GET
     path = get_path(query.get('dir', ''))
@@ -293,7 +288,7 @@ def delete(request):
         request.user.message_set.create(message=msg)
         return HttpResponseRedirect(reverse("fb_browse"))
     abs_path = os.path.join(MEDIA_ROOT, DIRECTORY, path)
-    
+
     msg = ""
     if request.GET:
         if request.GET.get('filetype') != "Folder":
@@ -335,10 +330,10 @@ def delete(request):
             except OSError:
                 # todo: define error message
                 msg = OSError
-    
+
     if msg:
         request.user.message_set.create(message=msg)
-    
+
     return render_to_response('filebrowser/index.html', {
         'dir': dir_name,
         'file': request.GET.get('filename', ''),
@@ -346,7 +341,6 @@ def delete(request):
         'settings_var': get_settings_var(),
         'breadcrumbs': get_breadcrumbs(query, dir_name, ''),
     }, context_instance=Context(request))
-delete = staff_member_required(never_cache(delete))
 
 
 # rename signals
@@ -356,12 +350,12 @@ filebrowser_post_rename = Signal(providing_args=["path", "filename", "new_filena
 def rename(request):
     """
     Rename existing File/Directory.
-    
+
     Includes renaming existing Image Versions/Thumbnails.
     """
-    
+
     from filebrowser.forms import RenameForm
-    
+
     # QUERY / PATH CHECK
     query = request.GET
     path = get_path(query.get('dir', ''))
@@ -375,7 +369,7 @@ def rename(request):
         return HttpResponseRedirect(reverse("fb_browse"))
     abs_path = os.path.join(MEDIA_ROOT, DIRECTORY, path)
     file_extension = os.path.splitext(filename)[1].lower()
-    
+
     if request.method == 'POST':
         form = RenameForm(abs_path, file_extension, request.POST)
         if form.is_valid():
@@ -405,7 +399,7 @@ def rename(request):
                 form.errors['name'] = forms.util.ErrorList([_('Error.')])
     else:
         form = RenameForm(abs_path, file_extension)
-    
+
     return render_to_response('filebrowser/rename.html', {
         'form': form,
         'query': query,
@@ -414,14 +408,13 @@ def rename(request):
         'settings_var': get_settings_var(),
         'breadcrumbs': get_breadcrumbs(query, path, _(u'Rename')),
     }, context_instance=Context(request))
-rename = staff_member_required(never_cache(rename))
 
 
 def versions(request):
     """
     Show all Versions for an Image according to ADMIN_VERSIONS.
     """
-    
+
     # QUERY / PATH CHECK
     query = request.GET
     path = get_path(query.get('dir', ''))
@@ -434,7 +427,7 @@ def versions(request):
         request.user.message_set.create(message=msg)
         return HttpResponseRedirect(reverse("fb_browse"))
     abs_path = os.path.join(MEDIA_ROOT, DIRECTORY, path)
-    
+
     return render_to_response('filebrowser/versions.html', {
         'original': path_to_url(os.path.join(DIRECTORY, path, filename)),
         'query': query,
@@ -442,6 +435,5 @@ def versions(request):
         'settings_var': get_settings_var(),
         'breadcrumbs': get_breadcrumbs(query, path, _(u'Versions for "%s"') % filename),
     }, context_instance=Context(request))
-versions = staff_member_required(never_cache(versions))
 
 
