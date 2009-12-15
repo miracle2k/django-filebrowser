@@ -14,6 +14,7 @@ from django import forms
 from django.core.urlresolvers import reverse
 from django.core.exceptions import ImproperlyConfigured
 from django.dispatch import Signal
+from django.core.files.move import file_move_safe
 
 # filebrowser imports
 from filebrowser.settings import *
@@ -185,6 +186,15 @@ def upload(request):
 
     from django.http import parse_cookie
 
+    if USE_NATIVE_UPLOAD and request.method == 'POST':
+        if 'file' in request.FILES:
+            _process_fileupload(request, request.FILES['file'], request.GET['dir'])
+            return HttpResponseRedirect(reverse('admin:filebrowser:browse') +
+                                        '?dir=%s' % request.GET['dir'])
+    else:
+        # Flash-upload submits to '_upload_file' view instead.
+        pass
+
     # QUERY / PATH CHECK
     query = request.GET
     path = get_path(query.get('dir', ''))
@@ -206,6 +216,29 @@ def upload(request):
         'breadcrumbs': get_breadcrumbs(query, path, _(u'Upload')),
         'session_key': session_key,
     }, context_instance=Context(request))
+
+
+def _process_fileupload(request, file, target_folder):
+    """Helper that is called upon a successful fileupload with the
+    file object, and a target folder.
+    """
+    abs_path = os.path.join(MEDIA_ROOT, DIRECTORY, target_folder)
+
+    file.name = convert_filename(file.name)
+    # PRE UPLOAD SIGNAL
+    filebrowser_pre_upload.send(sender=request, path=target_folder, file=file)
+    # HANDLE UPLOAD
+    uploadedfile = handle_file_upload(abs_path, file)
+    # MOVE UPLOADED FILE
+    # if file already exists
+    if os.path.isfile(os.path.join(MEDIA_ROOT, DIRECTORY, target_folder, file.name)):
+        old_file = os.path.join(abs_path, file.name)
+        new_file = os.path.join(abs_path, uploadedfile)
+        file_move_safe(new_file, old_file)
+    # POST UPLOAD SIGNAL
+    # TODO: Do something about the fileobject class.
+    filebrowser_post_upload.send(sender=request, path=target_folder,
+                                 file=FileObject(os.path.join(DIRECTORY, target_folder, file.name)))
 
 
 def _check_file(request):
@@ -239,28 +272,13 @@ def _upload_file(request):
     Upload file to the server.
     """
 
-    from django.core.files.move import file_move_safe
-
     if request.method == 'POST':
         folder = request.POST.get('folder')
         fb_uploadurl_re = re.compile(r'^(%s)' % reverse("admin:filebrowser:upload"))
         folder = fb_uploadurl_re.sub('', folder)
-        abs_path = os.path.join(MEDIA_ROOT, DIRECTORY, folder)
         if request.FILES:
             filedata = request.FILES['Filedata']
-            filedata.name = convert_filename(filedata.name)
-            # PRE UPLOAD SIGNAL
-            filebrowser_pre_upload.send(sender=request, path=request.POST.get('folder'), file=filedata)
-            # HANDLE UPLOAD
-            uploadedfile = handle_file_upload(abs_path, filedata)
-            # MOVE UPLOADED FILE
-            # if file already exists
-            if os.path.isfile(os.path.join(MEDIA_ROOT, DIRECTORY, folder, filedata.name)):
-                old_file = os.path.join(abs_path, filedata.name)
-                new_file = os.path.join(abs_path, uploadedfile)
-                file_move_safe(new_file, old_file)
-            # POST UPLOAD SIGNAL
-            filebrowser_post_upload.send(sender=request, path=request.POST.get('folder'), file=FileObject(os.path.join(DIRECTORY, folder, filedata.name)))
+            _process_fileupload(request, filedata, folder)
     return HttpResponse('True')
 _upload_file = flash_login_required(_upload_file)
 

@@ -193,6 +193,7 @@ def get_settings_var():
     # FileBrowser
     settings_var['URL_FILEBROWSER_MEDIA'] = URL_FILEBROWSER_MEDIA
     settings_var['PATH_FILEBROWSER_MEDIA'] = PATH_FILEBROWSER_MEDIA
+    settings_var['USE_NATIVE_UPLOAD'] = USE_NATIVE_UPLOAD
     # TinyMCE
     settings_var['URL_TINYMCE'] = URL_TINYMCE
     settings_var['PATH_TINYMCE'] = PATH_TINYMCE
