@@ -188,9 +188,10 @@ def upload(request):
 
     if USE_NATIVE_UPLOAD and request.method == 'POST':
         if 'file' in request.FILES:
-            _process_fileupload(request, request.FILES['file'], request.GET['dir'])
+            dir = request.GET.get('dir', '')
+            _process_fileupload(request, request.FILES['file'], dir)
             return HttpResponseRedirect(reverse('admin:filebrowser:browse') +
-                                        '?dir=%s' % request.GET['dir'])
+                                        '?dir=%s' % dir)
     else:
         # Flash-upload submits to '_upload_file' view instead.
         pass
