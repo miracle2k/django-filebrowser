@@ -54,7 +54,8 @@
     <div class="module filtered" id="changelist">
         {% include "filebrowser/include/toolbar.html" %}
         {% include "filebrowser/include/filter.html" %}
-        <table cellspacing="0">
+        <div class="results">
+          <table cellspacing="0">
             {% if results_var.results_current %}
                 {% include "filebrowser/include/tableheader.html" %}
             {% endif %}
@@ -63,7 +64,8 @@
                 {% include "filebrowser/include/filelisting.html" %}
             {% endfor %}
             </tbody>
-        </table>
+          </table>
+        </div>
         {% include "filebrowser/include/paginator.html" %}
     </div>
 </div>
