@@ -12,6 +12,7 @@
     <script type="text/javascript" src="{{ settings_var.URL_FILEBROWSER_MEDIA }}uploadify/jquery.uploadify.v2.1.0.js"></script>
     <script type="text/javascript" src="{{ settings_var.URL_FILEBROWSER_MEDIA }}uploadify/swfobject.js"></script>
     <script type="text/javascript" src="{% admin_media_prefix %}js/admin/CollapsedFieldsets.js"></script>
+    {% if not settings_var.USE_NATIVE_UPLOAD %}
     <script type="text/javascript">
     $(document).ready(function() {
         $('#id_file').uploadify({
@@ -46,6 +47,7 @@
         });
     });
     </script>
+    {% endif %}
 {% endblock %}
 
 <!-- COLTYPE/BODYCLASS -->
@@ -71,11 +73,11 @@
 <!-- CONTENT -->
 {% block content %}
 <div id="content-main">
-    <form>
+    <form enctype="multipart/form-data" method="POST">
     <div>
         <fieldset class="module aligned">
         <div class="form-row">
-            <input type="File" id="id_file" />
+            <input type="file" name="file" id="id_file" />
         </div>
         </fieldset>
 
@@ -104,9 +106,11 @@
         </fieldset>
 
         <div class="submit-row">
+            {% if not settings_var.USE_NATIVE_UPLOAD %}
             <p class="deletelink-box">
                 <a class="deletelink" href="javascript:$('#id_file').uploadifyClearQueue()">{% trans "Clear Queue" %}</a>
             </p>
+            {% endif %}
             <input class="default" type="submit" name="_save" value='{% trans "Upload" %}' />
         </div>
 

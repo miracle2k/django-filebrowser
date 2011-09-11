@@ -14,6 +14,7 @@ from django import forms
 from django.core.urlresolvers import reverse
 from django.core.exceptions import ImproperlyConfigured
 from django.dispatch import Signal
+from django.core.files.move import file_move_safe
 
 # filebrowser imports
 from filebrowser.settings import *
@@ -47,7 +48,7 @@ def browse(request):
         if directory is None:
             # The DIRECTORY does not exist, raise an error to prevent eternal redirecting.
             raise ImproperlyConfigured, _("Error finding Upload-Folder. Maybe it does not exist?")
-        redirect_url = reverse("fb_browse") + query_helper(query, "", "dir")
+        redirect_url = reverse("admin:filebrowser:browse") + query_helper(query, "", "dir")
         return HttpResponseRedirect(redirect_url)
     abs_path = os.path.join(MEDIA_ROOT, DIRECTORY, path)
 
@@ -139,7 +140,7 @@ def mkdir(request):
     if path is None:
         msg = _('The requested Folder does not exist.')
         request.user.message_set.create(message=msg)
-        return HttpResponseRedirect(reverse("fb_browse"))
+        return HttpResponseRedirect(reverse("admin:filebrowser:browse"))
     abs_path = os.path.join(MEDIA_ROOT, DIRECTORY, path)
 
     if request.method == 'POST':
@@ -159,7 +160,7 @@ def mkdir(request):
                 request.user.message_set.create(message=msg)
                 # on redirect, sort by date desc to see the new directory on top of the list
                 # remove filter in order to actually _see_ the new folder
-                redirect_url = reverse("fb_browse") + query_helper(query, "ot=desc,o=date", "ot,o,filter_type,filter_date,q")
+                redirect_url = reverse("admin:filebrowser:browse") + query_helper(query, "ot=desc,o=date", "ot,o,filter_type,filter_date,q")
                 return HttpResponseRedirect(redirect_url)
             except OSError, (errno, strerror):
                 if errno == 13:
@@ -185,13 +186,23 @@ def upload(request):
 
     from django.http import parse_cookie
 
+    if USE_NATIVE_UPLOAD and request.method == 'POST':
+        if 'file' in request.FILES:
+            dir = request.GET.get('dir', '')
+            _process_fileupload(request, request.FILES['file'], dir)
+            return HttpResponseRedirect(reverse('admin:filebrowser:browse') +
+                                        '?dir=%s' % dir)
+    else:
+        # Flash-upload submits to '_upload_file' view instead.
+        pass
+
     # QUERY / PATH CHECK
     query = request.GET
     path = get_path(query.get('dir', ''))
     if path is None:
         msg = _('The requested Folder does not exist.')
         request.user.message_set.create(message=msg)
-        return HttpResponseRedirect(reverse("fb_browse"))
+        return HttpResponseRedirect(reverse("admin:filebrowser:browse"))
     abs_path = os.path.join(MEDIA_ROOT, DIRECTORY, path)
 
     # SESSION (used for flash-uploading)
@@ -208,6 +219,29 @@ def upload(request):
     }, context_instance=Context(request))
 
 
+def _process_fileupload(request, file, target_folder):
+    """Helper that is called upon a successful fileupload with the
+    file object, and a target folder.
+    """
+    abs_path = os.path.join(MEDIA_ROOT, DIRECTORY, target_folder)
+
+    file.name = convert_filename(file.name)
+    # PRE UPLOAD SIGNAL
+    filebrowser_pre_upload.send(sender=request, path=target_folder, file=file)
+    # HANDLE UPLOAD
+    uploadedfile = handle_file_upload(abs_path, file)
+    # MOVE UPLOADED FILE
+    # if file already exists
+    if os.path.isfile(os.path.join(MEDIA_ROOT, DIRECTORY, target_folder, file.name)):
+        old_file = os.path.join(abs_path, file.name)
+        new_file = os.path.join(abs_path, uploadedfile)
+        file_move_safe(new_file, old_file)
+    # POST UPLOAD SIGNAL
+    # TODO: Do something about the fileobject class.
+    filebrowser_post_upload.send(sender=request, path=target_folder,
+                                 file=FileObject(os.path.join(DIRECTORY, target_folder, file.name)))
+
+
 def _check_file(request):
     """
     Check if file already exists on the server.
@@ -216,7 +250,7 @@ def _check_file(request):
     from django.utils import simplejson
 
     folder = request.POST.get('folder')
-    fb_uploadurl_re = re.compile(r'^(%s)' % reverse("fb_upload"))
+    fb_uploadurl_re = re.compile(r'^(%s)' % reverse("admin:filebrowser:upload"))
     folder = fb_uploadurl_re.sub('', folder)
 
     fileArray = {}
@@ -239,28 +273,13 @@ def _upload_file(request):
     Upload file to the server.
     """
 
-    from django.core.files.move import file_move_safe
-
     if request.method == 'POST':
         folder = request.POST.get('folder')
-        fb_uploadurl_re = re.compile(r'^(%s)' % reverse("fb_upload"))
+        fb_uploadurl_re = re.compile(r'^(%s)' % reverse("admin:filebrowser:upload"))
         folder = fb_uploadurl_re.sub('', folder)
-        abs_path = os.path.join(MEDIA_ROOT, DIRECTORY, folder)
         if request.FILES:
             filedata = request.FILES['Filedata']
-            filedata.name = convert_filename(filedata.name)
-            # PRE UPLOAD SIGNAL
-            filebrowser_pre_upload.send(sender=request, path=request.POST.get('folder'), file=filedata)
-            # HANDLE UPLOAD
-            uploadedfile = handle_file_upload(abs_path, filedata)
-            # MOVE UPLOADED FILE
-            # if file already exists
-            if os.path.isfile(os.path.join(MEDIA_ROOT, DIRECTORY, folder, filedata.name)):
-                old_file = os.path.join(abs_path, filedata.name)
-                new_file = os.path.join(abs_path, uploadedfile)
-                file_move_safe(new_file, old_file)
-            # POST UPLOAD SIGNAL
-            filebrowser_post_upload.send(sender=request, path=request.POST.get('folder'), file=FileObject(os.path.join(DIRECTORY, folder, filedata.name)))
+            _process_fileupload(request, filedata, folder)
     return HttpResponse('True')
 _upload_file = flash_login_required(_upload_file)
 
@@ -286,7 +305,7 @@ def delete(request):
         else:
             msg = _('The requested File does not exist.')
         request.user.message_set.create(message=msg)
-        return HttpResponseRedirect(reverse("fb_browse"))
+        return HttpResponseRedirect(reverse("admin:filebrowser:browse"))
     abs_path = os.path.join(MEDIA_ROOT, DIRECTORY, path)
 
     msg = ""
@@ -309,7 +328,7 @@ def delete(request):
                 # MESSAGE & REDIRECT
                 msg = _('The file %s was successfully deleted.') % (filename.lower())
                 request.user.message_set.create(message=msg)
-                redirect_url = reverse("fb_browse") + query_helper(query, "", "filename,filetype")
+                redirect_url = reverse("admin:filebrowser:browse") + query_helper(query, "", "filename,filetype")
                 return HttpResponseRedirect(redirect_url)
             except OSError:
                 # todo: define error message
@@ -325,7 +344,7 @@ def delete(request):
                 # MESSAGE & REDIRECT
                 msg = _('The folder %s was successfully deleted.') % (filename.lower())
                 request.user.message_set.create(message=msg)
-                redirect_url = reverse("fb_browse") + query_helper(query, "", "filename,filetype")
+                redirect_url = reverse("admin:filebrowser:browse") + query_helper(query, "", "filename,filetype")
                 return HttpResponseRedirect(redirect_url)
             except OSError:
                 # todo: define error message
@@ -366,7 +385,7 @@ def rename(request):
         else:
             msg = _('The requested File does not exist.')
         request.user.message_set.create(message=msg)
-        return HttpResponseRedirect(reverse("fb_browse"))
+        return HttpResponseRedirect(reverse("admin:filebrowser:browse"))
     abs_path = os.path.join(MEDIA_ROOT, DIRECTORY, path)
     file_extension = os.path.splitext(filename)[1].lower()
 
@@ -393,7 +412,7 @@ def rename(request):
                 # MESSAGE & REDIRECT
                 msg = _('Renaming was successful.')
                 request.user.message_set.create(message=msg)
-                redirect_url = reverse("fb_browse") + query_helper(query, "", "filename")
+                redirect_url = reverse("admin:filebrowser:browse") + query_helper(query, "", "filename")
                 return HttpResponseRedirect(redirect_url)
             except OSError, (errno, strerror):
                 form.errors['name'] = forms.util.ErrorList([_('Error.')])
@@ -425,7 +444,7 @@ def versions(request):
         else:
             msg = _('The requested File does not exist.')
         request.user.message_set.create(message=msg)
-        return HttpResponseRedirect(reverse("fb_browse"))
+        return HttpResponseRedirect(reverse("admin:filebrowser:browse"))
     abs_path = os.path.join(MEDIA_ROOT, DIRECTORY, path)
 
     return render_to_response('filebrowser/versions.html', {

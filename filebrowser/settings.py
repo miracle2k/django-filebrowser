@@ -1,5 +1,9 @@
 # coding: utf-8
 
+# TODO: This module could simply let django.conf.settings wrap itself
+# around it (see, e.g. django-assets), instead of doing all those manual
+# getattr() calls.
+
 # imports
 import os
 
@@ -103,6 +107,13 @@ CONVERT_FILENAME = getattr(settings, "FILEBROWSER_CONVERT_FILENAME", True)
 # Loading a Sever-Directory with lots of files might take a while
 # Use this setting to limit the items shown
 MAX_ITEMS = 1000
+
+# By default, uploadify (flash) is used. This forces a standard
+# HTTP upload through Django instead.
+# TODO: This mode currently does not support the "confirm override"
+# check; note however that filebrowser currently doesn't override
+# anything anyway, but rather adds a prefix.
+USE_NATIVE_UPLOAD = getattr(settings, "FILEBROWSER_USE_NATIVE_UPLOAD", False)
 
 # EXTRA TRANSLATION STRINGS
 # The following strings are not availabe within views or templates
