@@ -16,3 +16,6 @@ You need to create a custom AdminSite, and include the filebrowser mixin:
 
 This will ensure that filebrowser is wrapped inside ``self.admin_view()``,
 including support for your custom a ``admin_view`` implementation.
+
+For a more recent port, see also:
+    https://github.com/wardi/django-filebrowser-no-grappelli
