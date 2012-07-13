@@ -191,8 +191,6 @@ def get_settings_var():
     settings_var['MEDIA_URL'] = MEDIA_URL
     settings_var['DIRECTORY'] = DIRECTORY
     # FileBrowser
-    settings_var['URL_FILEBROWSER_MEDIA'] = URL_FILEBROWSER_MEDIA
-    settings_var['PATH_FILEBROWSER_MEDIA'] = PATH_FILEBROWSER_MEDIA
     settings_var['USE_NATIVE_UPLOAD'] = USE_NATIVE_UPLOAD
     # TinyMCE
     settings_var['URL_TINYMCE'] = URL_TINYMCE

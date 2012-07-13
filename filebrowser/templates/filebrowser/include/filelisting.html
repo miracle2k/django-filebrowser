@@ -1,4 +1,4 @@
-{% load i18n adminmedia fb_tags fb_versions %}
+{% load i18n fb_tags fb_versions staticfiles %}
 <tr class="{% cycle 'row1' 'row2' %}">
 
     <!-- FILESELECT FOR FILEBROWSEFIELD -->
@@ -9,7 +9,7 @@
         {% if selectable %}
         <a href="javascript://" onclick="FileSubmit('{{ file.url_save }}', '{{ file.url_thumbnail }}', '{{ file.filetype }}');" class="fb_selectlink" title="{% trans 'Select' %}"></a>
         {% else %}
-        <img src="{{ settings_var.URL_FILEBROWSER_MEDIA }}img/filebrowser_icon_select_disabled.gif" width="23" height="17" />
+        <img src="{% static "filebrowser/img/filebrowser_icon_select_disabled.gif" %}" width="23" height="17" />
         {% endif %}
     </td>
     {% endif %}
@@ -23,7 +23,7 @@
         {% if selectable %}
         <a href="javascript:FileBrowserDialogue.fileSubmit('{{ file.url_save }}');" class="fb_selectlink" title="{% trans 'Select File' %}"></a>
         {% else %}
-        <img src="{{ settings_var.URL_FILEBROWSER_MEDIA }}img/filebrowser_icon_select_disabled.gif" width="23" height="17" />
+        <img src="{% static "filebrowser/img/filebrowser_icon_select_disabled.gif" %}" width="23" height="17" />
         {% endif %}
     </td>
     {% endif %}
@@ -37,7 +37,7 @@
         {% if selectable %}
         <a href="#" onclick="OpenFile(ProtectPath('{{ file.url_save }}'));return false;" class="fb_selectlink" title="{% trans 'Select File' %}"></a>
         {% else %}
-        <img src="{{ settings_var.URL_FILEBROWSER_MEDIA }}img/filebrowser_icon_select_disabled.gif" width="23" height="17" />
+        <img src="{% static "filebrowser/img/filebrowser_icon_select_disabled.gif" %}" width="23" height="17" />
         {% endif %}
     </td>
     {% endif %}
@@ -51,7 +51,7 @@
     {% endif %}
 
     <!-- FILEICON -->
-    <td class="fb_icon"><img src="{{ settings_var.URL_FILEBROWSER_MEDIA }}img/filebrowser_type_{{ file.filetype|lower }}.gif" /></td>
+    <td class="fb_icon"><img src="{% static "filebrowser/img/filebrowser_type_"|add:file.filetype|lower|add:".gif" %}" /></td>
 
     <!-- THUMBNAIL -->
     {% if results_var.images_total %}
